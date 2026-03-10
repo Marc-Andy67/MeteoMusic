@@ -2,7 +2,7 @@
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useWeather } from '../context/Weathercontext';
+import { useWeather } from '../context/WeatherContext';
 
 export default function App() {
   const router = useRouter();
