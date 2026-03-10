@@ -1,7 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button } from 'react-native';
+import { StyleSheet, Text, View, Button, FlatList } from 'react-native';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Composants simples ───────────────────────────────────────────────────────
 
@@ -20,19 +21,53 @@ function Counter({ onReset, router }: { onReset: () => void; router: ReturnType<
   const renderCount = useRef(0);
   renderCount.current += 1;
 
+  // ── AsyncStorage : charger le compteur au démarrage ──────────────────────
+  useEffect(() => {
+    const loadCount = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('counter');
+        if (saved !== null) {
+          setCount(parseInt(saved));
+          console.log('[AsyncStorage] Compteur chargé :', saved);
+        }
+      } catch (e) {
+        console.error('[AsyncStorage] Erreur lecture :', e);
+      }
+    };
+    loadCount();
+  }, []); // ← une seule fois au montage
+
+  // ── AsyncStorage : sauvegarder à chaque changement de count ──────────────
+  useEffect(() => {
+    const saveCount = async () => {
+      try {
+        await AsyncStorage.setItem('counter', String(count));
+        console.log('[AsyncStorage] Compteur sauvegardé :', count);
+      } catch (e) {
+        console.error('[AsyncStorage] Erreur écriture :', e);
+      }
+    };
+    saveCount();
+  }, [count]); // ← se relance à chaque changement de count
+
   const increment = useCallback(() => setCount(c => c + 1), []);
   const decrement = useCallback(() => setCount(c => c - 1), []);
+
+  // ── Reset : remet à 0 ET efface AsyncStorage ─────────────────────────────
+  const handleResetWithStorage = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem('counter');
+      console.log('[AsyncStorage] Compteur effacé');
+      onReset();
+    } catch (e) {
+      console.error('[AsyncStorage] Erreur suppression :', e);
+    }
+  }, [onReset]);
 
   const label = useMemo(() => {
     if (count > 0) return `Positif (${count})`;
     if (count < 0) return `Négatif (${count})`;
     return 'Zéro';
-  }, [count]);
-
-  useEffect(() => {
-   // console.log(`[useEffect] Compteur : ${count}`);
-    return () => /*console.log(`[useEffect cleanup]`);*/console.clear();
-    
   }, [count]);
 
   useEffect(() => {
@@ -45,19 +80,45 @@ function Counter({ onReset, router }: { onReset: () => void; router: ReturnType<
   return (
     <View style={styles.card}>
       <Text style={styles.label}>{label}</Text>
+      {count >= 100 ? <Text style={{ color: 'red', fontWeight: 'bold' }}>🚨 Limite atteinte !</Text> : null}
       <Text style={styles.sub}>Re-renders : {renderCount.current} (useRef)</Text>
       <Button title="＋1" onPress={increment} />
       <Button title="－1" onPress={decrement} />
-      <Button title="Réinitialiser" onPress={onReset} />
+      <Button title="Réinitialiser" onPress={handleResetWithStorage} />
       <Button title="Tester le Context" onPress={() => router.push('/TestContext')} />
     </View>
   );
 }
 
+// ─── Données ──────────────────────────────────────────────────────────────────
+
+const items = [
+  { id: '1', name: 'Alice' },
+  { id: '2', name: 'Bob' },
+  { id: '3', name: 'Charlie' },
+  { id: '4', name: 'David' },
+  { id: '5', name: 'Eve' },
+  { id: '6', name: 'Frank' },
+  { id: '7', name: 'Grace' },
+  { id: '8', name: 'Hugo' },
+  { id: '9', name: 'Iris' },
+  { id: '10', name: 'Jules' },
+  { id: '11', name: 'Karen' },
+  { id: '12', name: 'Louis' },
+  { id: '13', name: 'Marie' },
+  { id: '14', name: 'Noel' },
+  { id: '15', name: 'Olivia' },
+  { id: '16', name: 'Paul' },
+  { id: '17', name: 'Quinn' },
+  { id: '18', name: 'Rose' },
+  { id: '19', name: 'Sam' },
+  { id: '20', name: 'Tina' },
+];
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const router = useRouter(); // ← déclaré ICI dans le composant
+  const router = useRouter();
   const [count, setCount] = useState(0);
   const handleReset = useCallback(() => setCount(0), []);
   const message = 'Hello, World!';
@@ -68,6 +129,15 @@ export default function App() {
       <Greeting name="Alice" />
       <Button title="Aller sur Page 2" onPress={() => router.push('/Page2')} />
       <GreetingChild>Bob</GreetingChild>
+
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <Text style={styles.text}>• {item.name}</Text>
+        )}
+      />
+
       <Counter onReset={handleReset} router={router} />
       <StatusBar style="auto" />
     </View>
