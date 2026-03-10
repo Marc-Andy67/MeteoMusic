@@ -1,4 +1,3 @@
-// app/index.tsx
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
