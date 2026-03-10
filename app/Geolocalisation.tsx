@@ -24,13 +24,14 @@ export default function App() {
   // useCallback : mémorise onReset pour éviter de casser la mémo de Counter
   const handleReset = useCallback(() => setCount(0), []);
 
-  const message = 'Hello, World!';
+  const message = 'Cherchez votre localisation';
 
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{message}</Text>
       <StatusBar style="auto" />
+      <Button title="Chercher" />
     </View>
     
   );

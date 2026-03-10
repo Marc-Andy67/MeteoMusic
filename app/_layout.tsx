@@ -12,17 +12,17 @@ export default function Layout() {
                 }} 
             />
             <Tabs.Screen 
-                name="Page2" 
+                name="Geolocalisation" 
                 options={{ 
-                    headerTitle: "Page 2",
-                    tabBarLabel: "Page 2",
+                    headerTitle: "Géolocalisation",
+                    tabBarLabel: "Géolocalisation",
                 }} 
             />
             <Tabs.Screen 
-                name="TestContext" 
+                name="Playlist" 
                 options={{ 
-                    headerTitle: "Test Context",
-                    tabBarLabel: "Context",
+                    headerTitle: "Playlists",
+                    tabBarLabel: "Playlists",
                 }} 
             />
         </Tabs>

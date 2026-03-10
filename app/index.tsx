@@ -119,26 +119,13 @@ const items = [
 
 export default function App() {
   const router = useRouter();
-  const [count, setCount] = useState(0);
-  const handleReset = useCallback(() => setCount(0), []);
-  const message = 'Hello, World!';
+  const message = 'MeteoMusic';
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{message}</Text>
-      <Greeting name="Alice" />
-      <Button title="Aller sur Page 2" onPress={() => router.push('/Page2')} />
-      <GreetingChild>Bob</GreetingChild>
-
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Text style={styles.text}>• {item.name}</Text>
-        )}
-      />
-
-      <Counter onReset={handleReset} router={router} />
+      <Button title="Cherchez votre localisation" onPress={() => router.push('/Geolocalisation')} />
+      <Button title="Voir mes playlists" onPress={() => router.push('/Playlist')} />
       <StatusBar style="auto" />
     </View>
   );
