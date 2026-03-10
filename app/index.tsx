@@ -125,7 +125,7 @@ export default function App() {
     <View style={styles.container}>
       <Text style={styles.title}>{message}</Text>
       <Button title="Cherchez votre localisation" onPress={() => router.push('/Geolocalisation')} />
-      <Button title="Voir mes playlists" onPress={() => router.push('/Playlist')} />
+      <Button title="Voir mes playlists" onPress={() => router.push('/playlist-index')} />
       <StatusBar style="auto" />
     </View>
   );

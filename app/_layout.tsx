@@ -21,11 +21,18 @@ export default function Layout() {
                 }} 
             />
             <Tabs.Screen 
-                name="Playlist" 
+                name="Music" 
+                options={{ 
+                    headerTitle: "Music",
+                    tabBarLabel: "Music",
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎧</Text>,
+                }} 
+            />
+            <Tabs.Screen 
+                name="playlists-index" 
                 options={{ 
                     headerTitle: "Playlists",
                     tabBarLabel: "Playlists",
-                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎧</Text>,
                 }} 
             />
         </Tabs>
