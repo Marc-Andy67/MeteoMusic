@@ -28,6 +28,20 @@ export default function Layout() {
                     tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎧</Text>,
                 }} 
             />
+            <Tabs.Screen 
+                name="Music" 
+                options={{ 
+                    headerTitle: "Music",
+                    tabBarLabel: "Music",
+                }} 
+            />
+            <Tabs.Screen 
+                name="playlists-index" 
+                options={{ 
+                    headerTitle: "Playlists",
+                    tabBarLabel: "Playlists",
+                }} 
+            />
         </Tabs>
     );
 }
