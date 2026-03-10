@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, Pressable, Modal,
-  StyleSheet, Image, ScrollView, ActivityIndicator
+  StyleSheet, Image, ScrollView, ActivityIndicator, TextInput
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -15,7 +15,6 @@ const CLIENT_ID = 'c3e93b7e';
 const BASE = 'https://api.jamendo.com/v3.0';
 
 export default function PlaylistDetail() {
-  // Récupère l'id passé en query param : /playlists-detail?id=xxx
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [playlist,   setPlaylist]  = useState<Playlist | null>(null);
@@ -24,7 +23,9 @@ export default function PlaylistDetail() {
   const [addModal,   setAddModal]  = useState(false);
   const [jamTracks,  setJamTracks] = useState<Track[]>([]);
   const [jamLoading, setJamLoading]= useState(false);
+  const [jamSearch,  setJamSearch] = useState('');
 
+  // Recharge depuis AsyncStorage → toujours à jour après suppression/ajout
   const load = useCallback(async () => {
     const all = await loadPlaylists();
     setPlaylist(all.find(p => p.id === id) ?? null);
@@ -32,6 +33,7 @@ export default function PlaylistDetail() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Audio ─────────────────────────────────────────────────────────────────
   async function togglePlay(track: Track) {
     if (sound) {
       await sound.stopAsync();
@@ -46,28 +48,36 @@ export default function PlaylistDetail() {
     await s.playAsync();
   }
 
+  // ── Retirer un track de la playlist ──────────────────────────────────────
   async function handleRemove(trackId: string) {
     if (!playlist) return;
     await removeTrackFromPlaylist(playlist.id, trackId);
-    load();
+    load(); // recharge → UI à jour
   }
 
+  // ── Ouvrir modal Jamendo ──────────────────────────────────────────────────
   async function openAddModal() {
     setAddModal(true);
     if (jamTracks.length > 0) return;
     setJamLoading(true);
-    const res = await fetch(
-      `${BASE}/tracks?client_id=${CLIENT_ID}&format=json&limit=50&imagesize=200&order=popularity_total`
-    );
-    const data = await res.json();
-    setJamTracks(data.results);
-    setJamLoading(false);
+    try {
+      const res = await fetch(
+        `${BASE}/tracks?client_id=${CLIENT_ID}&format=json&limit=200&imagesize=200&order=popularity_total`
+      );
+      const data = await res.json();
+      setJamTracks(data.results ?? []);
+    } catch (e) {
+      console.error('Jamendo fetch error:', e);
+    } finally {
+      setJamLoading(false);
+    }
   }
 
+  // ── Ajouter un track Jamendo à la playlist ────────────────────────────────
   async function handleAdd(track: Track) {
     if (!playlist) return;
     await addTrackToPlaylist(playlist.id, track);
-    load();
+    load(); // recharge → le ✓ s'affiche immédiatement
   }
 
   if (!playlist) return (
@@ -77,6 +87,14 @@ export default function PlaylistDetail() {
   );
 
   const weather = WEATHER_MOODS.find(w => w.id === playlist.weatherId);
+
+  // Filtre local sur la liste Jamendo dans le modal
+  const filteredJam = jamSearch.trim() === ''
+    ? jamTracks
+    : jamTracks.filter(t =>
+        t.name.toLowerCase().includes(jamSearch.toLowerCase()) ||
+        t.artist_name.toLowerCase().includes(jamSearch.toLowerCase())
+      );
 
   return (
     <View style={styles.container}>
@@ -100,7 +118,7 @@ export default function PlaylistDetail() {
         </View>
       </View>
 
-      {/* ── Tracks ── */}
+      {/* ── Tracks de la playlist ── */}
       <FlatList
         data={playlist.tracks}
         keyExtractor={t => t.id}
@@ -137,20 +155,39 @@ export default function PlaylistDetail() {
         <Text style={styles.fabText}>+</Text>
       </Pressable>
 
-      {/* ── Modal ajout Jamendo ── */}
+      {/* ── Modal ajout depuis Jamendo ── */}
       <Modal visible={addModal} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => setAddModal(false)} />
+        <Pressable style={styles.overlay} onPress={() => { setAddModal(false); setJamSearch(''); }} />
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Ajouter depuis Jamendo</Text>
-          {jamLoading
-            ? <ActivityIndicator color="#7C3AED" style={{ marginTop: 24 }} />
-            : (
-              <ScrollView style={{ maxHeight: 420 }}>
-                {jamTracks.map(track => {
-                  const alreadyIn = playlist.tracks.some(t => t.id === track.id);
-                  return (
+
+          {/* Recherche dans le modal */}
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Rechercher..."
+              placeholderTextColor="#6B7280"
+              value={jamSearch}
+              onChangeText={setJamSearch}
+            />
+            {jamSearch.length > 0 && (
+              <Pressable onPress={() => setJamSearch('')}>
+                <Text style={styles.clearBtn}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {jamLoading ? (
+            <ActivityIndicator color="#7C3AED" style={{ marginTop: 24 }} />
+          ) : (
+            <ScrollView style={{ maxHeight: 380 }}>
+              {filteredJam.map(track => {
+                // Lecture directe → se met à jour dès qu'on ajoute/retire
+                const alreadyIn = playlist.tracks.some(t => t.id === track.id);
+                return (
+                  <View key={track.id} style={styles.jamRow}>
                     <Pressable
-                      key={track.id}
                       style={[styles.jamCard, alreadyIn && styles.jamCardAdded]}
                       onPress={() => !alreadyIn && handleAdd(track)}
                     >
@@ -163,14 +200,20 @@ export default function PlaylistDetail() {
                         {alreadyIn ? '✓' : '+'}
                       </Text>
                     </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )
-          }
+
+                    {/* Bouton retirer — visible seulement si déjà dans la playlist */}
+                    {alreadyIn && (
+                      <Pressable style={styles.jamRemoveBtn} onPress={() => handleRemove(track.id)}>
+                        <Text style={styles.jamRemoveIcon}>✕</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
       </Modal>
-
     </View>
   );
 }
@@ -218,13 +261,23 @@ const styles = StyleSheet.create({
   overlay:        { flex: 1, backgroundColor: '#00000088' },
   sheet:          { backgroundColor: '#1A1A2E', borderTopLeftRadius: 24, borderTopRightRadius: 24,
                     padding: 24, gap: 12 },
-  sheetTitle:     { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
-  jamCard:        { flexDirection: 'row', alignItems: 'center', gap: 12,
-                    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2D2D40' },
-  jamCardAdded:   { opacity: 0.5 },
+  sheetTitle:     { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+
+  searchBox:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F0F1A',
+                    borderRadius: 10, paddingHorizontal: 10 },
+  searchIcon:     { fontSize: 14, marginRight: 6 },
+  searchInput:    { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
+  clearBtn:       { color: '#6B7280', fontSize: 14, paddingLeft: 6 },
+
+  jamRow:         { flexDirection: 'row', alignItems: 'center',
+                    borderBottomWidth: 1, borderBottomColor: '#2D2D40' },
+  jamCard:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  jamCardAdded:   { opacity: 0.6 },
   jamCover:       { width: 44, height: 44, borderRadius: 8 },
   jamInfo:        { flex: 1 },
   jamName:        { color: '#fff', fontSize: 14, fontWeight: '600' },
   jamArtist:      { color: '#9CA3AF', fontSize: 12 },
   addIcon:        { color: '#7C3AED', fontSize: 22, fontWeight: 'bold', width: 28, textAlign: 'center' },
+  jamRemoveBtn:   { padding: 12 },
+  jamRemoveIcon:  { color: '#EF4444', fontSize: 16, fontWeight: 'bold' },
 });
