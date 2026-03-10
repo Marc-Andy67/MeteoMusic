@@ -25,6 +25,13 @@ export default function Layout() {
                     tabBarLabel: "Context",
                 }} 
             />
+            <Tabs.Screen 
+                name="Music" 
+                options={{ 
+                    headerTitle: "Music",
+                    tabBarLabel: "Music",
+                }} 
+            />
         </Tabs>
     );
 }
