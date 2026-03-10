@@ -1,7 +1,7 @@
 // app/Geolocalisation.tsx
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useWeather } from '../context/Weathercontext';
+import { useWeather } from '../context/WeatherContext';
 
 export default function Geolocalisation() {
   const {
