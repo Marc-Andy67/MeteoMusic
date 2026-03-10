@@ -32,6 +32,13 @@ export default function Layout() {
                     tabBarLabel: "Music",
                 }} 
             />
+            <Tabs.Screen 
+                name="playlists-index" 
+                options={{ 
+                    headerTitle: "Playlists",
+                    tabBarLabel: "Playlists",
+                }} 
+            />
         </Tabs>
     );
 }
