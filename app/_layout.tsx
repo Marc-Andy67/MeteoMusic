@@ -29,10 +29,21 @@ export default function Layout() {
                 }} 
             />
             <Tabs.Screen 
-                name="playlists-index" 
+                name="playlist-index" 
                 options={{ 
-                    headerTitle: "Playlists",
-                    tabBarLabel: "Playlists",
+                    headerTitle: "Playlists-individuelles",
+                    tabBarLabel: "Playlists-individuelles",
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎶</Text>,
+                    
+                }} 
+            />
+            <Tabs.Screen 
+                name="playlists-detail" 
+                options={{ 
+                    headerTitle: "Playlists detail",
+                    tabBarLabel: "Playlists detail",
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎶</Text>,
+                    
                 }} 
             />
         </Tabs>

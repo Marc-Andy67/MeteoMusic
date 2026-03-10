@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -22,6 +22,10 @@ export default function App() {
   const [meteo, setMeteo] = useState<{ cityName: string; temperature: number; weatherCode: number } | null>(null);
 
   // ─── Recharge la météo à chaque fois qu'on revient sur la page ───────────
+  useEffect(() => {
+    AsyncStorage.removeItem('meteo');
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const chargerMeteo = async () => {
