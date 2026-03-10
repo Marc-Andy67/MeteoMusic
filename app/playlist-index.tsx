@@ -1,26 +1,31 @@
 // app/playlists-index.tsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, Pressable, TextInput,
   StyleSheet, Modal, ScrollView, Alert
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   Playlist, WEATHER_MOODS,
   loadPlaylists, createPlaylist, deletePlaylist
 } from '../storage/playlist';
 
 export default function PlaylistsPage() {
-  const [playlists, setPlaylists]     = useState<Playlist[]>([]);
-  const [modalVisible, setModal]      = useState(false);
-  const [newName, setNewName]         = useState('');
-  const [selectedWeather, setWeather] = useState<string | null>(null);
+  const [playlists,       setPlaylists] = useState<Playlist[]>([]);
+  const [modalVisible,    setModal]     = useState(false);
+  const [newName,         setNewName]   = useState('');
+  const [selectedWeather, setWeather]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setPlaylists(await loadPlaylists());
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // ← useFocusEffect au lieu de useEffect
+  // Se déclenche à chaque fois que l'écran devient actif
+  // → le compteur de morceaux est toujours à jour après un retour de playlists-detail
+  useFocusEffect(
+    useCallback(() => { load(); }, [load])
+  );
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -34,10 +39,10 @@ export default function PlaylistsPage() {
   async function handleDelete(id: string) {
     Alert.alert('Supprimer', 'Supprimer cette playlist ?', [
       { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: async () => {
-        await deletePlaylist(id);
-        load();
-      }},
+      {
+        text: 'Supprimer', style: 'destructive',
+        onPress: async () => { await deletePlaylist(id); load(); }
+      },
     ]);
   }
 

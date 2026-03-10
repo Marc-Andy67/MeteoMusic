@@ -1,5 +1,5 @@
 import { View, Text, Button, StyleSheet } from 'react-native';
-import { MyContextProvider, useMyContext } from '../context/MyContext';
+import { MyContextProvider, useMyContext } from './MyContext';
 
 // ← Lit la valeur du contexte
 function ComponentA() {
