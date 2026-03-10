@@ -37,7 +37,7 @@ export default function Layout() {
             }}
           />
           <Tabs.Screen
-            name="playlists-index"
+            name="playlist-index"
             options={{
               headerTitle: 'Playlists',
               tabBarLabel: 'Playlists',
@@ -47,8 +47,6 @@ export default function Layout() {
 
           {/* Pages cachées de la tab bar */}
           <Tabs.Screen name="playlists-detail" options={{ href: null }} />
-          <Tabs.Screen name="Playlist"         options={{ href: null }} />
-          <Tabs.Screen name="TestContext"       options={{ href: null }} />
         </Tabs>
 
         {/* MiniPlayer flottant en haut sur toutes les pages */}

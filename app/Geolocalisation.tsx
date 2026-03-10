@@ -12,7 +12,6 @@ export default function Geolocalisation() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Météo locale</Text>
-
       {errorMsg && <Text style={styles.error}>{errorMsg}</Text>}
 
       {/* ── Carte météo ── */}
