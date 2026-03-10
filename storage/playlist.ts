@@ -9,13 +9,28 @@ export type WeatherMood = {
 };
 
 export const WEATHER_MOODS: WeatherMood[] = [
-  { id: 'sunny',   label: 'Ensoleillé', emoji: '☀️',  color: '#F59E0B' },
-  { id: 'rainy',   label: 'Pluvieux',   emoji: '🌧️',  color: '#3B82F6' },
-  { id: 'storm',   label: 'Orageux',    emoji: '⛈️',  color: '#6B21A8' },
-  { id: 'snowy',   label: 'Neigeux',    emoji: '❄️',  color: '#BAE6FD' },
-  { id: 'foggy',   label: 'Brumeux',    emoji: '🌫️',  color: '#9CA3AF' },
-  { id: 'night',   label: 'Nuit',       emoji: '🌙',  color: '#1E1B4B' },
+  { id: 'sunny',   label: 'Ensoleillé',  emoji: '☀️',  color: '#F59E0B' }, // code 0
+  { id: 'cloudy',  label: 'Nuageux',     emoji: '⛅',   color: '#9CA3AF' }, // code 1-3
+  { id: 'foggy',   label: 'Brumeux',     emoji: '🌫️',  color: '#6B7280' }, // code 4-48
+  { id: 'drizzle', label: 'Bruine',      emoji: '🌦️',  color: '#60A5FA' }, // code 51-55
+  { id: 'rainy',   label: 'Pluvieux',    emoji: '🌧️',  color: '#3B82F6' }, // code 56-67
+  { id: 'snowy',   label: 'Neigeux',     emoji: '❄️',  color: '#BAE6FD' }, // code 71-77
+  { id: 'shower',  label: 'Averses',     emoji: '🌧️',  color: '#2563EB' }, // code 80-82
+  { id: 'sleet',   label: 'Neige fondue',emoji: '🌨️',  color: '#1E1B4B' }, // code 85-86
+  { id: 'thunder', label: 'Orage',       emoji: '⛈️',  color: '#DC2626' }, // code 95+
 ];
+
+export function weatherCodeToMoodId(code: number): string {
+  if (code === 0)         return 'sunny';
+  if (code <= 3)          return 'cloudy';
+  if (code <= 48)         return 'foggy';
+  if (code <= 55)         return 'drizzle';
+  if (code <= 67)         return 'rainy';
+  if (code <= 77)         return 'snowy';
+  if (code <= 82)         return 'shower';
+  if (code <= 86)         return 'sleet';
+  return 'thunder';
+}
 
 export type Track = {
   id: string;
