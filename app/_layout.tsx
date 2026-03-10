@@ -13,7 +13,7 @@ export default function Layout() {
 
         <Tabs>
           <Tabs.Screen
-            name="Index"
+            name="index"
             options={{
               headerTitle: 'Home',
               tabBarLabel: 'Accueil',
