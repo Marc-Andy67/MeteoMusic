@@ -10,12 +10,14 @@ import {
   Playlist, Track, WEATHER_MOODS,
   loadPlaylists, addTrackToPlaylist, removeTrackFromPlaylist
 } from '../storage/playlist';
+import { usePlayer } from '../context/PlayerContext';
 
 const CLIENT_ID = 'c3e93b7e';
 const BASE = 'https://api.jamendo.com/v3.0';
 
 export default function PlaylistDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const player  = usePlayer();
 
   const [playlist,   setPlaylist]  = useState<Playlist | null>(null);
   const [sound,      setSound]     = useState<Audio.Sound | null>(null);
@@ -25,7 +27,6 @@ export default function PlaylistDetail() {
   const [jamLoading, setJamLoading]= useState(false);
   const [jamSearch,  setJamSearch] = useState('');
 
-  // Recharge depuis AsyncStorage → toujours à jour après suppression/ajout
   const load = useCallback(async () => {
     const all = await loadPlaylists();
     setPlaylist(all.find(p => p.id === id) ?? null);
@@ -33,7 +34,7 @@ export default function PlaylistDetail() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Audio ─────────────────────────────────────────────────────────────────
+  // ── Lecture unitaire d'un track (preview dans le détail) ─────────────────
   async function togglePlay(track: Track) {
     if (sound) {
       await sound.stopAsync();
@@ -48,14 +49,27 @@ export default function PlaylistDetail() {
     await s.playAsync();
   }
 
-  // ── Retirer un track de la playlist ──────────────────────────────────────
+  // ── Lire toute la playlist via le PlayerContext ───────────────────────────
+  async function handlePlayPlaylist(startIndex = 0) {
+    if (!playlist || playlist.tracks.length === 0) return;
+    // Stoppe la lecture unitaire en cours si besoin
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+      setPlayingId(null);
+    }
+    await player.playPlaylist(playlist.tracks, playlist.name, startIndex);
+  }
+
+  // ── Retirer un track ──────────────────────────────────────────────────────
   async function handleRemove(trackId: string) {
     if (!playlist) return;
     await removeTrackFromPlaylist(playlist.id, trackId);
-    load(); // recharge → UI à jour
+    load();
   }
 
-  // ── Ouvrir modal Jamendo ──────────────────────────────────────────────────
+  // ── Modal Jamendo ─────────────────────────────────────────────────────────
   async function openAddModal() {
     setAddModal(true);
     if (jamTracks.length > 0) return;
@@ -73,11 +87,10 @@ export default function PlaylistDetail() {
     }
   }
 
-  // ── Ajouter un track Jamendo à la playlist ────────────────────────────────
   async function handleAdd(track: Track) {
     if (!playlist) return;
     await addTrackToPlaylist(playlist.id, track);
-    load(); // recharge → le ✓ s'affiche immédiatement
+    load();
   }
 
   if (!playlist) return (
@@ -86,15 +99,17 @@ export default function PlaylistDetail() {
     </View>
   );
 
-  const weather = WEATHER_MOODS.find(w => w.id === playlist.weatherId);
-
-  // Filtre local sur la liste Jamendo dans le modal
-  const filteredJam = jamSearch.trim() === ''
+  const weather      = WEATHER_MOODS.find(w => w.id === playlist.weatherId);
+  const filteredJam  = jamSearch.trim() === ''
     ? jamTracks
     : jamTracks.filter(t =>
         t.name.toLowerCase().includes(jamSearch.toLowerCase()) ||
         t.artist_name.toLowerCase().includes(jamSearch.toLowerCase())
       );
+
+  // Est-ce que cette playlist est celle en cours dans le player global ?
+  const isActivePlaylist = player.queue.length > 0 &&
+    player.queue[0]?.id === playlist.tracks[0]?.id;
 
   return (
     <View style={styles.container}>
@@ -118,7 +133,45 @@ export default function PlaylistDetail() {
         </View>
       </View>
 
-      {/* ── Tracks de la playlist ── */}
+      {/* ── Bouton Lire la playlist ── */}
+      {playlist.tracks.length > 0 && (
+        <View style={styles.playBar}>
+          {isActivePlaylist ? (
+            // Contrôles inline si la playlist est déjà en cours
+            <View style={styles.playControls}>
+              <Pressable
+                onPress={player.prevTrack}
+                style={[styles.ctrlBtn, player.currentIndex === 0 && styles.ctrlDisabled]}
+                disabled={player.currentIndex === 0}
+              >
+                <Text style={styles.ctrlIcon}>⏮</Text>
+              </Pressable>
+
+              <Pressable onPress={player.togglePause} style={styles.playBtnLarge}>
+                <Text style={styles.playBtnIcon}>{player.isPlaying ? '⏸' : '▶'}</Text>
+                <Text style={styles.playBtnLabel}>
+                  {player.isPlaying ? 'En lecture' : 'En pause'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={player.nextTrack}
+                style={[styles.ctrlBtn, player.currentIndex >= player.queue.length - 1 && styles.ctrlDisabled]}
+                disabled={player.currentIndex >= player.queue.length - 1}
+              >
+                <Text style={styles.ctrlIcon}>⏭</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.playBtnLarge} onPress={() => handlePlayPlaylist(0)}>
+              <Text style={styles.playBtnIcon}>▶</Text>
+              <Text style={styles.playBtnLabel}>Lire la playlist</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* ── Tracks ── */}
       <FlatList
         data={playlist.tracks}
         keyExtractor={t => t.id}
@@ -130,10 +183,19 @@ export default function PlaylistDetail() {
             <Text style={styles.emptyHint}>Appuie sur + pour en ajouter</Text>
           </View>
         }
-        renderItem={({ item }) => {
-          const isPlaying = playingId === item.id;
+        renderItem={({ item, index }) => {
+          const isPlaying        = playingId === item.id;
+          const isGlobalPlaying  = isActivePlaylist && player.currentIndex === index;
+
           return (
-            <View style={[styles.trackCard, isPlaying && styles.trackCardActive]}>
+            <View style={[
+              styles.trackCard,
+              isPlaying       && styles.trackCardActive,
+              isGlobalPlaying && styles.trackCardGlobal,
+            ]}>
+              {/* Numéro de piste */}
+              <Text style={styles.trackIndex}>{index + 1}</Text>
+
               <Pressable style={styles.trackLeft} onPress={() => togglePlay(item)}>
                 <Image source={{ uri: item.album_image }} style={styles.cover} />
                 <View style={styles.trackInfo}>
@@ -142,6 +204,15 @@ export default function PlaylistDetail() {
                 </View>
                 <Text style={styles.playIcon}>{isPlaying ? '⏹' : '▶️'}</Text>
               </Pressable>
+
+              {/* Lancer depuis ce track */}
+              <Pressable
+                style={styles.playFromBtn}
+                onPress={() => handlePlayPlaylist(index)}
+              >
+                <Text style={styles.playFromIcon}>▶</Text>
+              </Pressable>
+
               <Pressable onPress={() => handleRemove(item.id)} style={styles.removeBtn}>
                 <Text style={styles.removeIcon}>✕</Text>
               </Pressable>
@@ -155,13 +226,12 @@ export default function PlaylistDetail() {
         <Text style={styles.fabText}>+</Text>
       </Pressable>
 
-      {/* ── Modal ajout depuis Jamendo ── */}
+      {/* ── Modal Jamendo ── */}
       <Modal visible={addModal} transparent animationType="slide">
         <Pressable style={styles.overlay} onPress={() => { setAddModal(false); setJamSearch(''); }} />
         <View style={styles.sheet}>
           <Text style={styles.sheetTitle}>Ajouter depuis Jamendo</Text>
 
-          {/* Recherche dans le modal */}
           <View style={styles.searchBox}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
@@ -183,7 +253,6 @@ export default function PlaylistDetail() {
           ) : (
             <ScrollView style={{ maxHeight: 380 }}>
               {filteredJam.map(track => {
-                // Lecture directe → se met à jour dès qu'on ajoute/retire
                 const alreadyIn = playlist.tracks.some(t => t.id === track.id);
                 return (
                   <View key={track.id} style={styles.jamRow}>
@@ -200,8 +269,6 @@ export default function PlaylistDetail() {
                         {alreadyIn ? '✓' : '+'}
                       </Text>
                     </Pressable>
-
-                    {/* Bouton retirer — visible seulement si déjà dans la playlist */}
                     {alreadyIn && (
                       <Pressable style={styles.jamRemoveBtn} onPress={() => handleRemove(track.id)}>
                         <Text style={styles.jamRemoveIcon}>✕</Text>
@@ -219,65 +286,78 @@ export default function PlaylistDetail() {
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#0F0F1A', paddingTop: 60 },
-  center:         { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F1A' },
+  container:       { flex: 1, backgroundColor: '#0F0F1A', paddingTop: 60 },
+  center:          { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F0F1A' },
 
-  header:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-                    paddingHorizontal: 16, marginBottom: 20 },
-  backBtn:        { paddingTop: 4 },
-  backIcon:       { color: '#7C3AED', fontSize: 36, lineHeight: 36 },
-  headerInfo:     { flex: 1, gap: 6 },
-  title:          { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  weatherTag:     { flexDirection: 'row', alignItems: 'center', gap: 6,
-                    alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  weatherEmoji:   { fontSize: 16 },
-  weatherLabel:   { fontSize: 13, fontWeight: '600' },
-  meta:           { color: '#6B7280', fontSize: 13 },
+  header:          { flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+                     paddingHorizontal: 16, marginBottom: 12 },
+  backBtn:         { paddingTop: 4 },
+  backIcon:        { color: '#7C3AED', fontSize: 36, lineHeight: 36 },
+  headerInfo:      { flex: 1, gap: 6 },
+  title:           { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  weatherTag:      { flexDirection: 'row', alignItems: 'center', gap: 6,
+                     alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  weatherEmoji:    { fontSize: 16 },
+  weatherLabel:    { fontSize: 13, fontWeight: '600' },
+  meta:            { color: '#6B7280', fontSize: 13 },
 
-  list:           { padding: 16, gap: 10, paddingBottom: 100 },
-  trackCard:      { flexDirection: 'row', alignItems: 'center',
-                    backgroundColor: '#1E1E2E', borderRadius: 12, overflow: 'hidden' },
-  trackCardActive:{ borderWidth: 1, borderColor: '#7C3AED', backgroundColor: '#2D1B4E' },
-  trackLeft:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
-  cover:          { width: 48, height: 48, borderRadius: 8 },
-  trackInfo:      { flex: 1 },
-  trackName:      { color: '#fff', fontSize: 15, fontWeight: '600' },
-  artistName:     { color: '#9CA3AF', fontSize: 13, marginTop: 2 },
-  playIcon:       { fontSize: 20 },
-  removeBtn:      { padding: 16, borderLeftWidth: 1, borderLeftColor: '#2D2D40' },
-  removeIcon:     { color: '#EF4444', fontSize: 16, fontWeight: 'bold' },
+  // Barre play
+  playBar:         { paddingHorizontal: 16, marginBottom: 12 },
+  playControls:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  ctrlBtn:         { padding: 10 },
+  ctrlDisabled:    { opacity: 0.3 },
+  ctrlIcon:        { fontSize: 24, color: '#9CA3AF' },
+  playBtnLarge:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                     gap: 10, backgroundColor: '#7C3AED', borderRadius: 14, paddingVertical: 14 },
+  playBtnIcon:     { fontSize: 18, color: '#fff' },
+  playBtnLabel:    { color: '#fff', fontSize: 16, fontWeight: '700' },
 
-  empty:          { alignItems: 'center', paddingTop: 60, gap: 8 },
-  emptyEmoji:     { fontSize: 48 },
-  emptyText:      { color: '#9CA3AF', fontSize: 17, fontWeight: '500' },
-  emptyHint:      { color: '#4B5563', fontSize: 14 },
+  list:            { padding: 16, gap: 8, paddingBottom: 100 },
+  trackCard:       { flexDirection: 'row', alignItems: 'center',
+                     backgroundColor: '#1E1E2E', borderRadius: 12, overflow: 'hidden' },
+  trackCardActive: { borderWidth: 1, borderColor: '#7C3AED', backgroundColor: '#2D1B4E' },
+  trackCardGlobal: { borderWidth: 1, borderColor: '#22C55E', backgroundColor: '#0F2010' },
+  trackIndex:      { color: '#4B5563', fontSize: 12, width: 28, textAlign: 'center' },
+  trackLeft:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  cover:           { width: 44, height: 44, borderRadius: 8 },
+  trackInfo:       { flex: 1 },
+  trackName:       { color: '#fff', fontSize: 14, fontWeight: '600' },
+  artistName:      { color: '#9CA3AF', fontSize: 12, marginTop: 2 },
+  playIcon:        { fontSize: 18 },
+  playFromBtn:     { padding: 12, borderLeftWidth: 1, borderLeftColor: '#2D2D40' },
+  playFromIcon:    { color: '#7C3AED', fontSize: 14 },
+  removeBtn:       { padding: 12, borderLeftWidth: 1, borderLeftColor: '#2D2D40' },
+  removeIcon:      { color: '#EF4444', fontSize: 14, fontWeight: 'bold' },
 
-  fab:            { position: 'absolute', bottom: 32, right: 24, width: 60, height: 60,
-                    borderRadius: 30, backgroundColor: '#7C3AED',
-                    justifyContent: 'center', alignItems: 'center',
-                    shadowColor: '#7C3AED', shadowOpacity: 0.5, shadowRadius: 12, elevation: 8 },
-  fabText:        { color: '#fff', fontSize: 32, lineHeight: 36 },
+  empty:           { alignItems: 'center', paddingTop: 60, gap: 8 },
+  emptyEmoji:      { fontSize: 48 },
+  emptyText:       { color: '#9CA3AF', fontSize: 17, fontWeight: '500' },
+  emptyHint:       { color: '#4B5563', fontSize: 14 },
 
-  overlay:        { flex: 1, backgroundColor: '#00000088' },
-  sheet:          { backgroundColor: '#1A1A2E', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-                    padding: 24, gap: 12 },
-  sheetTitle:     { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  fab:             { position: 'absolute', bottom: 32, right: 24, width: 60, height: 60,
+                     borderRadius: 30, backgroundColor: '#7C3AED',
+                     justifyContent: 'center', alignItems: 'center',
+                     shadowColor: '#7C3AED', shadowOpacity: 0.5, shadowRadius: 12, elevation: 8 },
+  fabText:         { color: '#fff', fontSize: 32, lineHeight: 36 },
 
-  searchBox:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F0F1A',
-                    borderRadius: 10, paddingHorizontal: 10 },
-  searchIcon:     { fontSize: 14, marginRight: 6 },
-  searchInput:    { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
-  clearBtn:       { color: '#6B7280', fontSize: 14, paddingLeft: 6 },
-
-  jamRow:         { flexDirection: 'row', alignItems: 'center',
-                    borderBottomWidth: 1, borderBottomColor: '#2D2D40' },
-  jamCard:        { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  jamCardAdded:   { opacity: 0.6 },
-  jamCover:       { width: 44, height: 44, borderRadius: 8 },
-  jamInfo:        { flex: 1 },
-  jamName:        { color: '#fff', fontSize: 14, fontWeight: '600' },
-  jamArtist:      { color: '#9CA3AF', fontSize: 12 },
-  addIcon:        { color: '#7C3AED', fontSize: 22, fontWeight: 'bold', width: 28, textAlign: 'center' },
-  jamRemoveBtn:   { padding: 12 },
-  jamRemoveIcon:  { color: '#EF4444', fontSize: 16, fontWeight: 'bold' },
+  overlay:         { flex: 1, backgroundColor: '#00000088' },
+  sheet:           { backgroundColor: '#1A1A2E', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+                     padding: 24, gap: 12 },
+  sheetTitle:      { color: '#fff', fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  searchBox:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0F0F1A',
+                     borderRadius: 10, paddingHorizontal: 10 },
+  searchIcon:      { fontSize: 14, marginRight: 6 },
+  searchInput:     { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 },
+  clearBtn:        { color: '#6B7280', fontSize: 14, paddingLeft: 6 },
+  jamRow:          { flexDirection: 'row', alignItems: 'center',
+                     borderBottomWidth: 1, borderBottomColor: '#2D2D40' },
+  jamCard:         { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+  jamCardAdded:    { opacity: 0.6 },
+  jamCover:        { width: 44, height: 44, borderRadius: 8 },
+  jamInfo:         { flex: 1 },
+  jamName:         { color: '#fff', fontSize: 14, fontWeight: '600' },
+  jamArtist:       { color: '#9CA3AF', fontSize: 12 },
+  addIcon:         { color: '#7C3AED', fontSize: 22, fontWeight: 'bold', width: 28, textAlign: 'center' },
+  jamRemoveBtn:    { padding: 12 },
+  jamRemoveIcon:   { color: '#EF4444', fontSize: 16, fontWeight: 'bold' },
 });
