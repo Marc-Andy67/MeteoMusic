@@ -1,4 +1,5 @@
 import { Tabs } from "expo-router";
+import { Text } from "react-native";
 
 export default function Layout() {
     return (
@@ -8,7 +9,7 @@ export default function Layout() {
                 options={{ 
                     headerTitle: "Home",
                     tabBarLabel: "Accueil",
-                    tabBarIcon: () => null, // icône optionnelle
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text>,
                 }} 
             />
             <Tabs.Screen 
@@ -16,6 +17,7 @@ export default function Layout() {
                 options={{ 
                     headerTitle: "Géolocalisation",
                     tabBarLabel: "Géolocalisation",
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>📍</Text>,
                 }} 
             />
             <Tabs.Screen 
@@ -23,6 +25,7 @@ export default function Layout() {
                 options={{ 
                     headerTitle: "Playlists",
                     tabBarLabel: "Playlists",
+                    tabBarIcon: () => <Text style={{ fontSize: 20 }}>🎧</Text>,
                 }} 
             />
         </Tabs>
