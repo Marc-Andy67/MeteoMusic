@@ -2,6 +2,7 @@
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayer } from '../context/PlayerContext';
+import { colors, spacing, radius } from '../styles/theme';
 
 export default function MiniPlayer() {
   const {
@@ -14,8 +15,8 @@ export default function MiniPlayer() {
 
   if (!currentTrack) return null;
 
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < queue.length - 1;
+  const hasPrev  = currentIndex > 0;
+  const hasNext  = currentIndex < queue.length - 1;
   const progress = ((currentIndex + 1) / queue.length) * 100;
 
   return (
@@ -24,7 +25,7 @@ export default function MiniPlayer() {
 
         {/* Cover + infos */}
         <Image source={{ uri: currentTrack.album_image }} style={styles.cover} />
-        <View style={styles.info}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.trackName} numberOfLines={1}>{currentTrack.name}</Text>
           <Text style={styles.sub} numberOfLines={1}>
             {playlistName}  ·  {currentIndex + 1}/{queue.length}
@@ -33,33 +34,25 @@ export default function MiniPlayer() {
 
         {/* Contrôles */}
         <View style={styles.controls}>
-          <Pressable
-            onPress={prevTrack}
-            style={[styles.ctrlBtn, !hasPrev && styles.ctrlDisabled]}
-            disabled={!hasPrev}
-          >
+          <Pressable onPress={prevTrack} style={[styles.ctrlBtn, !hasPrev && styles.ctrlDisabled]} disabled={!hasPrev}>
             <Text style={styles.ctrlIcon}>⏮</Text>
           </Pressable>
 
           <Pressable onPress={togglePause} style={styles.playBtn}>
-            <Text style={styles.playIcon}>{isPlaying ? '⏸' : '▶️'}</Text>
+            <Text style={{ fontSize: 16 }}>{isPlaying ? '⏸' : '▶️'}</Text>
           </Pressable>
 
-          <Pressable
-            onPress={nextTrack}
-            style={[styles.ctrlBtn, !hasNext && styles.ctrlDisabled]}
-            disabled={!hasNext}
-          >
+          <Pressable onPress={nextTrack} style={[styles.ctrlBtn, !hasNext && styles.ctrlDisabled]} disabled={!hasNext}>
             <Text style={styles.ctrlIcon}>⏭</Text>
           </Pressable>
 
           <Pressable onPress={stopPlayer} style={styles.ctrlBtn}>
-            <Text style={styles.stopIcon}>✕</Text>
+            <Text style={{ fontSize: 14, color: colors.error, fontWeight: 'bold' }}>✕</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* Barre de progression en bas du player */}
+      {/* Barre de progression */}
       <View style={styles.progressBar}>
         <View style={[styles.progressFill, { width: `${progress}%` }]} />
       </View>
@@ -69,42 +62,38 @@ export default function MiniPlayer() {
 
 const styles = StyleSheet.create({
   container:    {
-    position:        'absolute',
-    left:            0,
-    right:           0,
-    zIndex:          999,
-    backgroundColor: '#1A1A2E',
+    position:          'absolute',
+    left:              0,
+    right:             0,
+    zIndex:            999,
+    backgroundColor:   colors.sheet,
     borderBottomWidth: 1,
-    borderBottomColor: '#2D2D40',
-    // Ombre pour se détacher du contenu en dessous
-    shadowColor:     '#000',
-    shadowOpacity:   0.4,
-    shadowRadius:    8,
-    shadowOffset:    { width: 0, height: 2 },
-    elevation:       10,
+    borderBottomColor: colors.border,
+    shadowColor:       '#000',
+    shadowOpacity:     0.4,
+    shadowRadius:      8,
+    shadowOffset:      { width: 0, height: 2 },
+    elevation:         10,
   },
   inner:        {
-    flexDirection:  'row',
-    alignItems:     'center',
-    paddingHorizontal: 12,
+    flexDirection:     'row',
+    alignItems:        'center',
+    paddingHorizontal: spacing.md,
     paddingVertical:   10,
-    gap:            10,
+    gap:               spacing.md,
   },
-  cover:        { width: 42, height: 42, borderRadius: 8 },
-  info:         { flex: 1 },
-  trackName:    { color: '#fff', fontSize: 14, fontWeight: '600' },
-  sub:          { color: '#6B7280', fontSize: 11, marginTop: 2 },
-  controls:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ctrlBtn:      { padding: 8 },
+  cover:        { width: 42, height: 42, borderRadius: radius.sm },
+  trackName:    { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  sub:          { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  controls:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  ctrlBtn:      { padding: spacing.sm },
   ctrlDisabled: { opacity: 0.3 },
-  ctrlIcon:     { fontSize: 18, color: '#9CA3AF' },
+  ctrlIcon:     { fontSize: 18, color: colors.textSecondary },
   playBtn:      {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#7C3AED',
+    backgroundColor: colors.primary,
     justifyContent: 'center', alignItems: 'center',
   },
-  playIcon:     { fontSize: 16 },
-  stopIcon:     { fontSize: 14, color: '#EF4444', fontWeight: 'bold' },
-  progressBar:  { height: 2, backgroundColor: '#2D2D40' },
-  progressFill: { height: 2, backgroundColor: '#7C3AED' },
+  progressBar:  { height: 2, backgroundColor: colors.border },
+  progressFill: { height: 2, backgroundColor: colors.primary },
 });
