@@ -1,16 +1,25 @@
 // app/index.tsx
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useWeather } from '../context/WeatherContext';
 import { global } from '../styles/global';
+import { colors, spacing } from '../styles/theme';
 
 export default function App() {
   const router = useRouter();
   const { temperature, cityName, currentMood, active } = useWeather();
 
   return (
-    <View style={global.screenCentered}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      contentContainerStyle={{
+        alignItems: 'center',
+        gap: spacing.lg,
+        padding: spacing.xl,
+        paddingBottom: 40,
+      }}
+    >
       <Text style={global.headerTitle}>🎵 MeteoMusic</Text>
 
       {active && cityName && temperature !== null && currentMood ? (
@@ -41,14 +50,14 @@ export default function App() {
       </Pressable>
 
       <StatusBar style="light" />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  cardFull:    { width: '100%', alignItems: 'center', gap: 10 },
-  city:        { fontSize: 18, fontWeight: '600', color: '#fff' },
-  emoji:       { fontSize: 72 },
-  temp:        { fontSize: 52, fontWeight: 'bold', color: '#fff' },
+  cardFull:     { width: '100%', alignItems: 'center', gap: 10 },
+  city:         { fontSize: 18, fontWeight: '600', color: '#fff' },
+  emoji:        { fontSize: 72 },
+  temp:         { fontSize: 52, fontWeight: 'bold', color: '#fff' },
   btnSecondary: { backgroundColor: '#1E1E2E' },
 });
