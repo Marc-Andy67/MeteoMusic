@@ -1,25 +1,45 @@
 // app/Geolocalisation.tsx
+// Page de géolocalisation et météo.
+// Permet d'activer la position GPS pour avoir la météo locale,
+// ou de rechercher manuellement une ville.
+
 import { StyleSheet, Text, View, Pressable, TextInput } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { useWeather } from '../context/WeatherContext';
+import { useWeather } from '../context/WeatherContext'; // Hook pour accéder au contexte météo global
 
 export default function Geolocalisation() {
+
+  // ── useWeather() ──────────────────────────────────────────────────────────
+  // On récupère depuis le contexte global WeatherContext :
+  // - temperature : température actuelle en °C
+  // - weatherCode : code météo WMO (ex: 0 = soleil, 61 = pluie...)
+  // - cityName    : nom de la ville détectée par le GPS
+  // - currentMood : objet ambiance calculé depuis le weatherCode (emoji, couleur, label)
+  // - active      : true si la géolocalisation est activée
+  // - errorMsg    : message d'erreur si la permission GPS est refusée
+  // - activate    : fonction pour démarrer la géolocalisation
+  // - deactivate  : fonction pour arrêter la géolocalisation
   const {
     temperature, weatherCode, cityName, currentMood,
     active, errorMsg, activate, deactivate,
   } = useWeather();
 
-  // ─── États pour la recherche manuelle ────────────────────────────────────
-  const [searchVisible, setSearchVisible] = useState(false);
-  const [searchQuery,   setSearchQuery]   = useState('');
-  const [suggestions,   setSuggestions]   = useState<{ name: string; country: string; latitude: number; longitude: number }[]>([]);
-  const [searchResult,  setSearchResult]  = useState<{
+  // ── États locaux pour la recherche manuelle ───────────────────────────────
+  const [searchVisible, setSearchVisible] = useState(false);      // Affiche/cache la barre de recherche
+  const [searchQuery,   setSearchQuery]   = useState('');          // Texte tapé dans la barre de recherche
+  const [suggestions,   setSuggestions]   = useState<{            // Liste des villes proposées par l'API
+    name: string; country: string; latitude: number; longitude: number
+  }[]>([]);
+  const [searchResult,  setSearchResult]  = useState<{            // Résultat météo de la ville cherchée
     city: string; temperature: number; emoji: string; color: string; label: string;
   } | null>(null);
-  const [searchError,   setSearchError]   = useState<string | null>(null);
+  const [searchError,   setSearchError]   = useState<string | null>(null); // Erreur de recherche
 
-  // ─── Convertit le code WMO en mood simple ────────────────────────────────
+  // ── getMoodFromCode() ─────────────────────────────────────────────────────
+  // Convertit un code météo WMO en objet ambiance pour la recherche manuelle.
+  // (Le contexte WeatherContext le fait pour la géolocalisation,
+  //  mais ici on en a besoin localement pour la recherche par ville)
   function getMoodFromCode(code: number) {
     if (code === 0)  return { emoji: '☀️', label: 'Ensoleillé',  color: '#F59E0B' };
     if (code <= 3)   return { emoji: '⛅', label: 'Nuageux',     color: '#9CA3AF' };
@@ -32,34 +52,42 @@ export default function Geolocalisation() {
     return           { emoji: '⛈️',        label: 'Orageux',     color: '#7C3AED' };
   }
 
-  // ─── Cherche des suggestions au fur et à mesure de la frappe ─────────────
+  // ── fetchSuggestions() ────────────────────────────────────────────────────
+  // Appelée à chaque frappe dans la barre de recherche.
+  // Utilise l'API Geocoding d'Open-Meteo pour trouver des villes correspondantes.
+  // On attend au moins 2 caractères avant de lancer la recherche.
   const fetchSuggestions = async (text: string) => {
     setSearchQuery(text);
     setSearchError(null);
-    if (text.length < 2) { setSuggestions([]); return; }
+    if (text.length < 2) { setSuggestions([]); return; } // Pas assez de caractères
 
+    // API Geocoding Open-Meteo : retourne jusqu'à 5 villes correspondant au nom
     const geoUrl  = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(text)}&count=5&language=fr&format=json`;
     const geoRes  = await fetch(geoUrl);
     const geoData = await geoRes.json();
-    setSuggestions(geoData.results || []);
+    setSuggestions(geoData.results || []); // Si aucun résultat, tableau vide
   };
 
-  // ─── Sélectionne une suggestion et récupère la météo ─────────────────────
+  // ── selectCity() ──────────────────────────────────────────────────────────
+  // Appelée quand l'utilisateur appuie sur une suggestion.
+  // Récupère la météo de la ville sélectionnée via l'API Open-Meteo.
   const selectCity = async (city: { name: string; country: string; latitude: number; longitude: number }) => {
-    setSuggestions([]);
-    setSearchQuery(city.name);
+    setSuggestions([]);          // Ferme la liste de suggestions
+    setSearchQuery(city.name);   // Met le nom dans la barre de recherche
     setSearchError(null);
 
     try {
+      // API météo Open-Meteo avec les coordonnées de la ville sélectionnée
       const meteoUrl  = `https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=temperature_2m,weather_code&timezone=auto`;
       const meteoRes  = await fetch(meteoUrl);
       const meteoData = await meteoRes.json();
-      const mood      = getMoodFromCode(meteoData.current.weather_code);
+      const mood      = getMoodFromCode(meteoData.current.weather_code); // Convertit le code en ambiance
 
+      // Sauvegarde le résultat pour l'afficher dans la carte
       setSearchResult({
         city:        `${city.name}, ${city.country}`,
         temperature: meteoData.current.temperature_2m,
-        ...mood,
+        ...mood, // Spread de emoji, label, color
       });
     } catch {
       setSearchError('Erreur lors de la récupération de la météo');
@@ -69,14 +97,19 @@ export default function Geolocalisation() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Météo locale</Text>
+
+      {/* Affiche l'erreur GPS si la permission est refusée */}
       {errorMsg && <Text style={styles.error}>{errorMsg}</Text>}
 
-      {/* ── Carte météo géolocalisation ── */}
+      {/* ── Carte météo géolocalisation ──────────────────────────────────────
+          Affichée uniquement si le GPS est actif ET qu'on a toutes les données.
+          La bordure change de couleur selon l'ambiance météo (currentMood.color) */}
       {active && cityName && temperature !== null && currentMood && (
         <View style={[styles.card, { borderColor: currentMood.color, borderWidth: 2 }]}>
           <Text style={styles.city}>📍 {cityName}</Text>
           <Text style={styles.emoji}>{currentMood.emoji}</Text>
           <Text style={styles.temp}>{temperature}°C</Text>
+          {/* Badge ambiance avec fond semi-transparent */}
           <View style={[styles.moodBadge, { backgroundColor: currentMood.color + '33' }]}>
             <Text style={[styles.moodLabel, { color: currentMood.color }]}>{currentMood.label}</Text>
           </View>
@@ -84,7 +117,8 @@ export default function Geolocalisation() {
         </View>
       )}
 
-      {/* ── Carte météo recherche manuelle ── */}
+      {/* ── Carte météo recherche manuelle ───────────────────────────────────
+          Affichée uniquement après avoir sélectionné une ville dans la recherche */}
       {searchResult && (
         <View style={[styles.card, { borderColor: searchResult.color, borderWidth: 2 }]}>
           <Text style={styles.city}>🔍 {searchResult.city}</Text>
@@ -96,7 +130,10 @@ export default function Geolocalisation() {
         </View>
       )}
 
-      {/* ── Barre de recherche avec suggestions ── */}
+      {/* ── Barre de recherche avec suggestions ──────────────────────────────
+          Visible uniquement si searchVisible est true.
+          La liste de suggestions apparaît automatiquement sous le champ texte
+          dès que des résultats sont disponibles. */}
       {searchVisible && (
         <View style={styles.searchContainer}>
           <TextInput
@@ -104,9 +141,10 @@ export default function Geolocalisation() {
             placeholder="Nom de la ville..."
             placeholderTextColor="#6B7280"
             value={searchQuery}
-            onChangeText={fetchSuggestions}
-            autoFocus
+            onChangeText={fetchSuggestions} // Lance la recherche à chaque frappe
+            autoFocus                        // Ouvre le clavier automatiquement
           />
+          {/* Liste des suggestions — affichée seulement si on a des résultats */}
           {suggestions.length > 0 && (
             <View style={styles.suggestionsList}>
               {suggestions.map((s, i) => (
@@ -119,9 +157,11 @@ export default function Geolocalisation() {
         </View>
       )}
 
+      {/* Erreur de recherche manuelle */}
       {searchError && <Text style={styles.error}>{searchError}</Text>}
 
-      {/* ── Boutons ── */}
+      {/* ── Bouton GPS ────────────────────────────────────────────────────────
+          Affiche "Activer" ou "Désactiver" selon l'état active */}
       {!active ? (
         <Pressable style={styles.btn} onPress={activate}>
           <Text style={styles.btnText}>📍 Activer la géolocalisation</Text>
@@ -132,6 +172,9 @@ export default function Geolocalisation() {
         </Pressable>
       )}
 
+      {/* ── Bouton recherche ──────────────────────────────────────────────────
+          Ouvre/ferme la barre de recherche.
+          Quand on ferme, on remet tout à zéro (résultat, query, suggestions) */}
       <Pressable style={styles.btn} onPress={() => {
         setSearchVisible(!searchVisible);
         setSearchResult(null);
@@ -148,6 +191,7 @@ export default function Geolocalisation() {
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#0F0F1A', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   title:           { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
